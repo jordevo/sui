@@ -8,6 +8,5 @@ export default data => ({
   context,
   name: data.name,
   properties: {...data.properties},
-  type: 'screen',
   userId: data.userId
 })

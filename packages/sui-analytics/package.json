@@ -11,8 +11,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@s-ui/js": "1.26.0",
-    "@s-ui/polyfills": "1.9.0",
+    "@s-ui/js": "1",
+    "@s-ui/polyfills": "1",
     "axios": "0.18.0",
     "uuid": "3.3.2"
   },

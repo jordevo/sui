@@ -9,6 +9,5 @@ export default data => ({
   name: data.name,
   originalTimestamp: new Date().toISOString(),
   properties: {...data.properties},
-  type: 'track',
   userId: data.userId
 })

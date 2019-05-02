@@ -6,6 +6,5 @@ export default data => ({
   context,
   originalTimestamp: new Date().toISOString(),
   traits: {...data.traits},
-  type: 'identify',
   userId: data.userId
 })

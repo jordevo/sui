@@ -44,7 +44,6 @@ describe('#Analytics', () => {
       expect(args.userId).to.equal(identifyData.userId)
       expect(typeof args.context).to.equal('object')
       expect(args.originalTimestamp).to.exist
-      expect(args.type).to.equal('identify')
     })
   })
 
@@ -66,11 +65,9 @@ describe('#Analytics', () => {
       expect(args.properties).to.deep.equal(screenData.properties)
       expect(args.traits).to.be.undefined
       expect(args.anonymousId).to.equal(anonymousId)
-      expect(args.type).to.be.equal('screen')
       expect(args.userId).to.equal(screenData.userId)
       expect(typeof args.context).to.equal('object')
       expect(args.originalTimestamp).to.exist
-      expect(args.type).to.equal('screen')
     })
   })
 
@@ -92,12 +89,10 @@ describe('#Analytics', () => {
       expect(args.properties).to.deep.equal(trackData.properties)
       expect(args.traits).to.be.undefined
       expect(args.anonymousId).to.not.be.undefined
-      expect(args.type).to.be.equal('track')
       expect(args.event).to.be.equal(trackData.event)
       expect(args.userId).to.equal(trackData.userId)
       expect(typeof args.context).to.equal('object')
       expect(args.originalTimestamp).to.exist
-      expect(args.type).to.equal('track')
     })
   })
 
