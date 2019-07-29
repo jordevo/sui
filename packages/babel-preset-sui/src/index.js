@@ -12,7 +12,6 @@ function getTargets({targets = {}}) {
 
 function plugins(api, opts = {}) {
   return cleanList([
-    require('@babel/plugin-syntax-dynamic-import').default,
     require('@babel/plugin-syntax-export-default-from').default,
     require('@babel/plugin-syntax-export-namespace-from').default,
     require('@babel/plugin-proposal-optional-chaining').default,
