@@ -2,12 +2,13 @@
 /* eslint no-console:0 */
 
 const path = require('path')
+const os = require('os')
 const program = require('commander')
 const fs = require('fs')
 const {getSpawnPromise, showError} = require('@s-ui/helpers/cli')
 const {resolveLazyNPMBin} = require('@s-ui/helpers/packages')
-const CYPRESS_VERSION =
-  require(path.join(__dirname, '..', 'package.json')).cypressVersion || '3.2.0'
+const CYPRESS_VERSION = require(path.join(__dirname, '..', 'package.json'))
+  .cypressVersion
 const CYPRESS_FOLDER_PATH = path.resolve(__dirname, 'cypress')
 const TESTS_FOLDER = process.cwd() + '/test-e2e'
 const SCREENSHOTS_FOLDER = process.cwd() + '/.tmp/test-e2e/screenshots'
@@ -46,17 +47,33 @@ program
     'Overwrite string to UserAgent header.'
   )
   .option('-s, --scope <spec>', 'Run tests specifying a subfolder of specs')
+  .option(
+    '-b, --browser <browser>',
+    'Select a different browser (chrome|edge|firefox)'
+  )
+  .option('-N, --noWebSecurity', 'Disable all web securities')
   .option('-G, --gui', 'Run the tests in GUI mode.')
+  .option('-R, --record', 'Record tests and send result to Dashboard Service')
+  .option('-C, --ci', 'Continuos integration mode, reduces memory consumption')
+  .option(
+    '-K, --key <key>',
+    'It is used to authenticate the project into the Dashboard Service'
+  )
   .on('--help', () => console.log(HELP_MESSAGE))
   .parse(process.argv)
 
 const {
   baseUrl,
-  userAgentAppend,
-  userAgent,
+  browser,
+  ci,
   gui,
+  key,
+  noWebSecurity,
+  record,
+  scope,
   screenshotsOnError,
-  scope
+  userAgent,
+  userAgentAppend
 } = program
 const cypressConfig = {
   integrationFolder: path.join(TESTS_FOLDER, scope || ''),
@@ -79,12 +96,38 @@ if (screenshotsOnError) {
   cypressConfig.screenshotsFolder = SCREENSHOTS_FOLDER
 }
 
+if (ci) {
+  cypressConfig.numTestsKeptInMemory = 1
+  cypressConfig.numSnapshotsKeptInMemory = 1
+}
+
+let projectURI = CYPRESS_FOLDER_PATH
+if (noWebSecurity) {
+  const defaultConfig = require(path.join(CYPRESS_FOLDER_PATH, 'cypress.json'))
+  const nextCypressConfig = {
+    ...defaultConfig,
+    chromeWebSecurity: false
+  }
+
+  const nextFolderPath = path.join(os.tmpdir(), '' + Date.now())
+  fs.mkdirSync(nextFolderPath)
+  fs.writeFileSync(
+    path.join(nextFolderPath, 'cypress.json'),
+    JSON.stringify(nextCypressConfig, null, 2),
+    'utf8'
+  )
+  projectURI = nextFolderPath
+}
+
 resolveLazyNPMBin('cypress/bin/cypress', `cypress@${CYPRESS_VERSION}`)
   .then(cypressBinPath =>
     getSpawnPromise(cypressBinPath, [
       gui ? 'open' : 'run',
       '--config=' + objectToCommaString(cypressConfig),
-      '--project=' + CYPRESS_FOLDER_PATH
+      '--project=' + projectURI,
+      browser && '--browser=' + browser,
+      record && '--record',
+      key && '--key=' + key
     ])
   )
   .catch(showError)

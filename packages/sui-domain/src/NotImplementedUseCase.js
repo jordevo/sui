@@ -1,6 +1,3 @@
-/* eslint no-console:0 */
-import UseCase from './UseCase'
-
 /**
  * This is the default use case returned
  * by the domain when asking for a not implemented
@@ -10,12 +7,11 @@ import UseCase from './UseCase'
  * the requested method is not implemented yet.
  *
  * */
-export default class NotImplementedUseCase extends UseCase {
+export default class NotImplementedUseCase {
   /**
    * @param {string} key The requested use case not being implemented
    */
   constructor(key) {
-    super()
     this._key = key
   }
 
@@ -25,9 +21,7 @@ export default class NotImplementedUseCase extends UseCase {
   execute() {
     return Promise.resolve(
       console.warn(
-        `Service ${
-          this._key
-        } is not implemented in the current version of the domain`
+        `Service ${this._key} is not implemented in the current version of the domain`
       )
     )
   }

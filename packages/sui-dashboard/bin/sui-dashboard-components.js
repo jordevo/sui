@@ -4,10 +4,13 @@
 const os = require('os')
 const path = require('path')
 const program = require('commander')
-const {parallelSpawn} = require('@s-ui/helpers/cli')
+const {parallelSpawn, serialSpawn} = require('@s-ui/helpers/cli')
+const fs = require('fs')
 const {stats} = require('../src')
 
 program
+  .option('-v, --versions', 'output versions used')
+  .option('-o, --output <filename>', 'save result on filename')
   .on('--help', () => {
     console.log('  Examples:')
     console.log('')
@@ -15,6 +18,8 @@ program
     console.log('')
   })
   .parse(process.argv)
+
+const programOptions = program.opts()
 
 const WORK_DIRECTORY = path.join(os.tmpdir(), Date.now().toString())
 const FLAGS_INSTALL = [
@@ -37,15 +42,28 @@ const repositories = [
 
   'frontend-ma--web-app',
   'frontend-ma--uilib-widgets',
+  'frontend-ma--web-app-plus',
 
   'frontend-mt--web-app',
-  'frontend-mt--uilib-widgets',
+  'frontend-mt--uilib-widgets-coches',
+  'frontend-mt--uilib-widgets-motos',
+  'frontend-cf--web-app',
+  'frontend-mt--uilib-widgets-coches-pro',
 
   'frontend-fc--web-server',
   'frontend-fc--uilib-widgets',
   'frontend-fcbw--uilib-widgets',
 
-  'frontend-ij--uilib-widgets'
+  'frontend-hab--uilib-widgets',
+  'frontend-hab--web-professional',
+  'frontend-hab--web-app',
+
+  'frontend-ij--uilib-widgets',
+  'frontend-ij--web-app',
+
+  'frontend-if--uilib-widgets',
+
+  'frontend-re--ut-web-app'
 ]
 
 const cloneSUIComponentsCommand = [
@@ -63,7 +81,7 @@ const cloneCommands = repositories.map(repo => [
   'git',
   [
     'clone',
-    `git@github.schibsted.io:scmspain/${repo}.git`,
+    `git@github.mpi-internal.com:scmspain/${repo}.git`,
     path.join(WORK_DIRECTORY, repo)
   ]
 ])
@@ -76,8 +94,19 @@ const installCommands = repositories.map(repo => [
 ;(async () => {
   await parallelSpawn(cloneSUIComponentsCommand)
   await parallelSpawn(cloneCommands)
-  await parallelSpawn(installCommands)
-  const statsComponents = await stats({repositories, root: WORK_DIRECTORY})
+  await serialSpawn(installCommands)
+  const statsComponents = await stats({
+    repositories,
+    root: WORK_DIRECTORY,
+    getVersions: programOptions.versions
+  })
 
   console.log(statsComponents)
+  if (programOptions.output) {
+    fs.writeFileSync(
+      program.output,
+      JSON.stringify(statsComponents, null, 2),
+      'utf8'
+    )
+  }
 })()

@@ -1,28 +1,24 @@
 import PropTypes from 'prop-types'
-import React, {Component} from 'react'
+import React, {useEffect, useState} from 'react'
 import Markdown from './Markdown'
-import {tryRequireMarkdown} from '../tryRequire'
+import {fetchMarkdownFile} from '../tryRequire'
 
-export default class MarkdownFile extends Component {
-  propTypes = {
-    params: PropTypes.object,
-    file: PropTypes.string
-  }
+export default function MarkdownFile({file, params}) {
+  const [content, setContent] = useState(null)
 
-  state = {
-    content: false
-  }
+  useEffect(
+    function() {
+      const {category, component} = params
+      fetchMarkdownFile({category, component, file}).then(setContent)
+      import('./markdown.css') // eslint-disable-line
+    },
+    [params, file]
+  )
 
-  async componentDidMount() {
-    const {file, params} = this.props
-    const content = await tryRequireMarkdown({...params, file})
-    this.setState({content})
-  }
-
-  render() {
-    const {content} = this.state
-    return content && <Markdown content={content} />
-  }
+  return content && <Markdown content={content} />
 }
 
-MarkdownFile.displayName = 'MarkdownFile'
+MarkdownFile.propTypes = {
+  params: PropTypes.object,
+  file: PropTypes.string
+}

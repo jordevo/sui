@@ -4,11 +4,16 @@ const archiver = require('archiver')
 const program = require('commander')
 const authDefinitionBuilder = require('./authDefinitionBuilder')
 
-module.exports = ({outputZipPath, pkg}) =>
+module.exports = ({outputZipPath, pkg, entryPoint, dockerRegistry}) =>
   new Promise((resolve, reject) => {
-    let authVariableDefinition = program.auth
+    const authVariableDefinition = program.auth
       ? authDefinitionBuilder(program.auth.split(':'))
       : ''
+    const entryPointPreWork = !entryPoint
+      ? ''
+      : 'COPY ./entry-point ./entry-point\nRUN chmod +x ./entry-point'
+
+    const entryPointLine = !entryPoint ? '' : 'ENTRYPOINT ["./entry-point"]'
     const output = program.outputFileName
       ? fs.createWriteStream(outputZipPath)
       : process.stdout
@@ -17,6 +22,7 @@ module.exports = ({outputZipPath, pkg}) =>
     })
 
     output.on('close', () => {
+      // eslint-disable-next-line no-console
       console.log(
         '-> File',
         program.outputFileName.magenta.bold + '.zip'.magenta.bold,
@@ -24,6 +30,7 @@ module.exports = ({outputZipPath, pkg}) =>
         Math.round(archive.pointer() / 1024).toString().blue.bold +
           ' kb'.blue.bold
       )
+      // eslint-disable-next-line no-console
       console.log(' -> Success ✅'.green)
 
       resolve()
@@ -36,6 +43,12 @@ module.exports = ({outputZipPath, pkg}) =>
         name: 'package.json'
       }
     )
+
+    entryPoint &&
+      archive.append(fs.readFileSync(entryPoint, 'utf8'), {
+        name: 'entry-point'
+      })
+
     archive.append(
       fs
         .readFileSync(path.join(__dirname, 'pm2.tpl'), 'utf8')
@@ -46,7 +59,10 @@ module.exports = ({outputZipPath, pkg}) =>
     archive.append(
       fs
         .readFileSync(path.join(__dirname, 'Dockerfile.tpl'), 'utf8')
-        .replace('{{AUTH_VARIABLES}}', authVariableDefinition),
+        .replace('{{DOCKER_REGISTRY}}', dockerRegistry)
+        .replace('{{AUTH_VARIABLES}}', authVariableDefinition)
+        .replace('{{ENTRYPOINT_PREWORK}}', entryPointPreWork)
+        .replace('{{ENTRYPOINT}}', entryPointLine),
       {name: 'Dockerfile'}
     )
     archive.directory(path.join(process.cwd(), 'public'), 'public')

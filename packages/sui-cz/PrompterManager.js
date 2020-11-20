@@ -1,7 +1,6 @@
 /* eslint-disable no-console */
 
 // Promisify polyfill to add compatibility on node < 8 versions.
-require('util.promisify/shim')()
 const {write: writeLegacy, close: closeLegacy, readFileSync} = require('fs')
 const {open} = require('temp').track()
 const path = require('path')
@@ -111,11 +110,10 @@ class PrompterManager {
             )
           )
             .then(result => result.filter(Boolean))
-            .then(
-              result =>
-                typesWithOtherScopes.indexOf(answers.type) > -1
-                  ? result.concat(otherScopes)
-                  : result
+            .then(result =>
+              typesWithOtherScopes.indexOf(answers.type) > -1
+                ? result.concat(otherScopes)
+                : result
             )
         }
       },

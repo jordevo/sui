@@ -1,54 +1,33 @@
-const cleanList = require('./clean-list')
-const {
-  DEFAULT_BROWSER_TARGETS,
-  SELECTIVE_LOOSE_REACT_HOOKS
-} = require('./defaults')
+const {DEFAULT_BROWSER_TARGETS} = require('./defaults')
 
-function getTargets({targets = {}}) {
+const getTargets = ({targets = {}}) => {
   const {browser = DEFAULT_BROWSER_TARGETS} = targets
-
   return browser
 }
 
-function plugins(api, opts = {}) {
-  return cleanList([
-    require('@babel/plugin-syntax-dynamic-import').default,
-    require('@babel/plugin-syntax-export-default-from').default,
-    require('@babel/plugin-syntax-export-namespace-from').default,
-    require('@babel/plugin-proposal-optional-chaining').default,
-    require('@babel/plugin-proposal-nullish-coalescing-operator').default,
-    [require('@babel/plugin-proposal-decorators').default, {legacy: true}],
-    [require('@babel/plugin-proposal-class-properties').default, {loose: true}],
-    [
-      require('babel-plugin-transform-react-remove-prop-types').default,
-      {
-        wrap: true
-      }
-    ],
-    [
-      require('@babel/plugin-proposal-object-rest-spread').default,
-      {useBuiltIns: true} // asume Object.assign is available by browser or polyfill
-    ],
-    [
-      require('@babel/plugin-transform-runtime').default,
-      {
-        corejs: false,
-        useESModules: true,
-        regenerator: true
-      }
-    ],
-    [
-      require('@babel/plugin-transform-destructuring').default,
-      {
-        // Use loose mode for performance on selected react hooks
-        loose: false,
-        selectiveLoose: SELECTIVE_LOOSE_REACT_HOOKS
-      }
-    ]
-  ])
-}
+const plugins = (api, {useESModules = true} = {}) => [
+  require('babel-plugin-preval'),
+  require('@babel/plugin-syntax-export-default-from').default,
+  require('@babel/plugin-syntax-export-namespace-from').default,
+  [require('@babel/plugin-proposal-decorators').default, {legacy: true}],
+  [require('@babel/plugin-proposal-class-properties').default, {loose: true}],
+  [
+    require('babel-plugin-transform-react-remove-prop-types').default,
+    {
+      removeImport: true
+    }
+  ],
+  [
+    require('@babel/plugin-transform-runtime').default,
+    {
+      corejs: false,
+      useESModules,
+      regenerator: true
+    }
+  ]
+]
 
-function presets(api, opts) {
+const presets = (api, opts = {}) => {
   const {targets} = opts
 
   return [
@@ -56,20 +35,28 @@ function presets(api, opts) {
       require('@babel/preset-env').default,
       {
         debug: false,
+        exclude: ['transform-typeof-symbol'], // Exclude transforms that make all code slower
         ignoreBrowserslistConfig: true,
         loose: true,
         modules: false,
-        // Exclude transforms that make all code slower
-        exclude: ['transform-typeof-symbol'],
         targets: getTargets({targets}),
         useBuiltIns: false
       }
     ],
-    [require('@babel/preset-react').default, {useBuiltIns: true}]
+    [
+      require('@babel/preset-react').default,
+      {runtime: 'automatic', useBuiltIns: true}
+    ]
   ]
 }
 
-module.exports = (api, opts) => ({
-  presets: presets(api, opts),
-  plugins: plugins(api, opts)
-})
+module.exports = (api, opts) => {
+  // Permacache the computed config and never call this config function again
+  // more info: https://babeljs.io/docs/en/config-files#config-function-api
+  api.cache(true)
+
+  return {
+    presets: presets(api, opts),
+    plugins: plugins(api, opts)
+  }
+}

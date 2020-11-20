@@ -57,6 +57,13 @@ class ClientMock extends Mock {
     return this
   }
 
+  patch(path) {
+    this._method = 'PATCH'
+    this._path = path
+
+    return this
+  }
+
   post(path) {
     this._method = 'POST'
     this._path = path
@@ -101,6 +108,21 @@ class ClientMock extends Mock {
         : `${this._baseUrl}${this._path}${this._query}`,
       this._responseResolver(response, statusCode, headers)
     )
+
+    return this
+  }
+
+  toStandardRequest(request) {
+    return {
+      url: request.url,
+      body: request.requestBody,
+      headers: request.requestHeaders
+    }
+  }
+
+  requestNTH(index) {
+    const request = this._server.requests[index]
+    return this.toStandardRequest(request)
   }
 }
 

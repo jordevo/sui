@@ -2,6 +2,10 @@ import {Mocker, Mock} from './mockerInterface'
 import nock from 'nock'
 
 class ServerMocker extends Mocker {
+  restore() {
+    nock.cleanAll()
+  }
+
   httpMock(baseUrl) {
     return new ServerMock(nock, baseUrl)
   }
@@ -27,6 +31,13 @@ class ServerMock extends Mock {
   getRegexp(path) {
     this.get(path)
     this._path = RegExp(path)
+
+    return this
+  }
+
+  patch(path) {
+    this._method = 'patch'
+    this._path = path
 
     return this
   }
@@ -66,6 +77,8 @@ class ServerMock extends Mock {
     }
 
     mock.reply(statusCode, JSON.stringify(response))
+
+    return this
   }
 }
 

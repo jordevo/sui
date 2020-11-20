@@ -81,6 +81,7 @@ npm install @s-ui/test --save-dev
 
         -I, --inspect Inspect node process
         -W, --watch  Run in watch mode
+        -T, --timeout Customize test timeout
         -P, --pattern <pattern>  Path pattern to include (default: test)
         -h, --help   output usage information
     Description:
@@ -108,7 +109,7 @@ If you need to have support files, then create a `./test-e2e/support` directory,
 
 Support files runs before every single spec file and you don't have to import it in spec file.
 
-Example: 
+Example:
 
 `./test-e2e/support/index.js`
 
@@ -134,7 +135,10 @@ Then you can use in your specs `cy.login()`
     -U, --userAgentAppend <userAgentAppend>  Append string to UserAgent header.
     -UA, --userAgent <userAgent>             Overwrite string to UserAgent header.
     -G, --gui                                Run the tests in GUI mode.
+    -C, --ci                                 CI Mode, reduces memory consumption
     -h, --help                               output usage information
+    -b, --browser <browser>                  Select a different browser (chrome|edge|firefox)
+    -N, --noWebSecurity                      Disable all web securities (CORS)
 ```
 
 #### `sui-test e2e --gui`
@@ -163,7 +167,22 @@ Cypress can be detected as a robot if your server has that kind of protection or
 
 If defined, any error on your tests will create a screenshot of that moment in the `./.tmp/test-e2e/screenshots` folder of your project.
 
+# Config
 
+`@s-ui/test` could use a `config` in your `package.json` to tweak some behaviors. These are
+
+- `server`: Config for `@s-ui/test server` binary:
+  - `forceTranspilation`: List of regexs (string based, later will be transformed with `new Regex`) of modules to transpile. This is useful in case you're using server tests for modules that are ESModules based and need to be transpiled with `@babel/plugin-transform-modules-commonjs`.
+
+```json
+"config": {
+  "sui-test": {
+    "server": {
+      "forceTranspilation": ["@adv-ui/vendor-by-consents-loader"]
+    }
+  }
+}
+```
 
 # Tools
 

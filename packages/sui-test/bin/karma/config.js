@@ -1,4 +1,5 @@
 const webpack = require('webpack')
+const path = require('path')
 
 const TARGET = process.env.npm_lifecycle_event
 const CWD = process.cwd()
@@ -15,11 +16,41 @@ const config = {
   browsers: ['Chrome'],
 
   webpack: {
+    devtool: 'eval',
     mode: 'development',
+    resolve: {
+      alias: {
+        '@s-ui/react-context': path.resolve(
+          path.join(process.env.PWD, './node_modules/@s-ui/react-context')
+        )
+      },
+      extensions: ['.mjs', '.js', '.jsx', '.json']
+    },
     node: {
       fs: 'empty'
     },
-    plugins: [new webpack.EnvironmentPlugin(['NODE_ENV'])],
+    // webpack has the ability to generate path info in the output bundle.
+    // However, this puts garbage collection pressure on projects that bundle thousands of modules.
+    output: {
+      pathinfo: false
+    },
+    plugins: [
+      new webpack.EnvironmentPlugin(['NODE_ENV']),
+      new webpack.DefinePlugin(
+        Object.assign(
+          {},
+          {
+            __BASE_DIR__: JSON.stringify(process.env.PWD)
+          }
+        )
+      )
+    ],
+    // avoid unneded optimizations for running our tests in order to get fatest bundling time
+    optimization: {
+      removeAvailableModules: false,
+      removeEmptyChunks: false,
+      splitChunks: false
+    },
     module: {
       rules: [
         {
@@ -30,7 +61,7 @@ const config = {
               options: {
                 babelrc: false,
                 cacheDirectory: true,
-                highlightCode: true,
+                sourceType: 'unambiguous',
                 presets: [
                   [
                     require.resolve('babel-preset-sui'),
@@ -40,15 +71,17 @@ const config = {
                   ]
                 ],
                 plugins: [
-                  require.resolve('babel-plugin-dynamic-import-node'),
-                  require.resolve('@babel/plugin-proposal-export-default-from'),
-                  require.resolve(
-                    '@babel/plugin-proposal-export-namespace-from'
-                  )
+                  require.resolve('babel-plugin-istanbul'),
+                  require.resolve('./babelPatch.js')
                 ]
               }
             }
           ]
+        },
+        {
+          // ignore css/scss require/imports files in the server
+          test: [/\.s?css$/, /\.svg$/],
+          use: ['null-loader']
         }
       ]
     }
@@ -63,6 +96,9 @@ const config = {
 
 if (TARGET === 'test:ci') {
   config.reporters = ['coverage'].concat(config.reporters)
+  config.preprocessors = {
+    'src/**/*.js': ['coverage']
+  }
   config.coverageReporter = {
     dir: `${CWD}/coverage`,
     reporters: [

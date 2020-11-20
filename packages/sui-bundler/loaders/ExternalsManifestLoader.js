@@ -1,14 +1,20 @@
-const path = require('path')
 const https = require('https')
+const http = require('http')
 let MANIFEST = false
 
-const getRemoteManifest = url =>
-  new Promise((resolve, reject) => {
+/**
+ * Return a Manifest object from the origen defined
+ * @param {string} url - Url to request the manifest
+ * @return {Promise<Object>} this should be the manifest
+ * */
+const getRemoteManifest = url => {
+  const client = url.indexOf('https') > -1 ? https : http
+  return new Promise((resolve, reject) => {
     if (MANIFEST) {
       return resolve(MANIFEST)
     }
 
-    https
+    client
       .get(url, resp => {
         let data = ''
 
@@ -24,23 +30,31 @@ const getRemoteManifest = url =>
         reject(err)
       })
   })
+}
 
 async function externalsManifestLoader(source) {
   const cb = this.async()
   const {manifestURL} = this.query
+
+  if (process.env.NODE_ENV === 'development') {
+    return cb(null, source)
+  }
 
   if (!manifestURL) {
     return cb(null, source)
   }
 
   try {
-    const dirname = path.dirname(manifestURL)
-    const manifest = await getRemoteManifest(manifestURL)
+    const manifest = await getRemoteManifest(
+      typeof manifestURL === 'string'
+        ? manifestURL
+        : manifestURL[process.env.NODE_ENV]
+    )
     const entries = Object.entries(manifest)
     const nextSource = entries.reduce((acc, entry) => {
       const [dest, src] = entry
-      const regex = new RegExp(`${dirname}${dest}`, 'g')
-      return acc.replace(regex, `${dirname}${src}`)
+      const regex = new RegExp(dest, 'g')
+      return acc.replace(regex, src)
     }, source)
 
     cb(null, nextSource)

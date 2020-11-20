@@ -1,20 +1,16 @@
 import PropTypes from 'prop-types'
-import React from 'react'
 import Tabs from './Tabs'
 import Tab from './Tab'
 
-import {isEmptyObject} from '../utils'
-
-const ContextButtons = ({ctxt, onContextChange, selected}) => {
-  if (isEmptyObject(ctxt)) {
-    return null
-  }
+const ContextButtons = ({ctxt, onContextChange, selected = 0}) => {
+  const contextKeys = Object.keys(ctxt)
+  if (contextKeys.length === 0) return null
 
   return (
     <Tabs title="Context">
-      {Object.keys(ctxt).map((ctxtType, index) => (
+      {contextKeys.map((ctxtType, index) => (
         <Tab
-          handleClick={evt => onContextChange(ctxtType, index)}
+          handleClick={() => onContextChange(ctxtType, index)}
           isActive={index === selected}
           key={`${ctxtType}${index}`}
           literal={ctxtType}
@@ -24,15 +20,10 @@ const ContextButtons = ({ctxt, onContextChange, selected}) => {
   )
 }
 
-ContextButtons.displayName = 'ContextButtons'
-
 ContextButtons.propTypes = {
   ctxt: PropTypes.object,
   onContextChange: PropTypes.func,
   selected: PropTypes.number
 }
 
-ContextButtons.defaultProps = {
-  selected: 0
-}
 export default ContextButtons

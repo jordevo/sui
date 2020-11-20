@@ -1,3 +1,5 @@
+import jsesc from 'jsesc'
+
 const APP_PLACEHOLDER = '<!-- APP -->'
 const HEAD_CLOSING_TAG = '</head>'
 const BODY_CLOSING_TAG = '</body>'
@@ -8,22 +10,34 @@ const BODY_CLOSING_TAG = '</body>'
  * @return {Array}
  */
 export const getTplParts = req => {
-  let appParts = req.htmlTemplate.split(HEAD_CLOSING_TAG)
+  let copyHTMLTemplate = (' ' + req.htmlTemplate).slice(1)
+  const appParts = copyHTMLTemplate.split(HEAD_CLOSING_TAG)
 
   appParts[0] = `${appParts[0]}${HEAD_CLOSING_TAG}`
+  copyHTMLTemplate = null
 
   return appParts
 }
 
 export class HtmlBuilder {}
 
-HtmlBuilder.buildHead = ({headTplPart, helmetHead = {}}) => {
-  return headTplPart.replace(
-    HEAD_CLOSING_TAG,
-    `${Object.keys(helmetHead)
-      .map(section => helmetHead[section].toString())
-      .join('')}${HEAD_CLOSING_TAG}`
+HtmlBuilder.buildHead = ({headTplPart, headString = ''}) => {
+  let copyHeadTplPart = (' ' + headTplPart).slice(1)
+  let copyHeadString = (' ' + headString).slice(1)
+
+  let headElement = copyHeadTplPart.substr(copyHeadTplPart.indexOf('<head'))
+  let headOpenningTag = headElement.substr(0, headElement.indexOf('>') + 1)
+
+  const nextHead = copyHeadTplPart.replace(
+    headOpenningTag,
+    `${headOpenningTag}${copyHeadString}`
   )
+  copyHeadTplPart = null
+  copyHeadString = null
+  headElement = null
+  headOpenningTag = null
+
+  return nextHead
 }
 
 HtmlBuilder.buildBody = ({
@@ -34,7 +48,7 @@ HtmlBuilder.buildBody = ({
   initialProps,
   performance
 }) => {
-  let html = `${bodyTplPart}`
+  let html = (' ' + bodyTplPart).slice(1)
 
   if (bodyAttributes) {
     html = html.replace('<body>', `<body ${bodyAttributes.toString()}>`)
@@ -69,8 +83,12 @@ HtmlBuilder.buildBody = ({
   return html
 }
 
-HtmlBuilder.injectDataHydration = ({windowPropertyName, data = {}}) =>
-  `<script>window.${windowPropertyName} = ${JSON.stringify(data).replace(
-    /<\//g,
-    '<\\/'
-  )};</script>`
+HtmlBuilder.injectDataHydration = ({windowPropertyName, data = {}}) => {
+  const jsonSource = jsesc(JSON.stringify(data), {
+    json: true,
+    isScriptContext: true
+  })
+
+  const jsonExpr = `JSON.parse(${jsonSource})`
+  return `<script>window.${windowPropertyName} = ${jsonExpr};</script>`
+}

@@ -1,41 +1,51 @@
-import React, {Component} from 'react'
+/* eslint-disable no-console */
+
 import PropTypes from 'prop-types'
 import ReactDOM from 'react-dom'
 import Context from '@s-ui/react-context'
-import {Provider as ProviderLegacy} from '@s-ui/react-domain-connector'
+import {useMount} from '@s-ui/react-hooks'
 
-export default class Widget extends Component {
-  static propTypes = {
-    children: PropTypes.element,
-    node: PropTypes.string,
-    i18n: PropTypes.object,
-    domain: PropTypes.object
-  }
+function renderWidgetOnDOM({children, context, node}) {
+  ReactDOM.render(
+    <Context.Provider value={context}>{children}</Context.Provider>,
+    node
+  )
+}
 
-  componentDidMount() {
-    const {node: selector, children, i18n, domain} = this.props
-    const node = document.querySelector(selector)
-
-    if (!node) {
-      return console.warn(`[Widget] unable find the selector ${selector}`) // eslint-disable-line
+export default function Widget({
+  children,
+  context = {},
+  isVisible = true,
+  selector,
+  renderMultiple = false
+}) {
+  useMount(function() {
+    if (!selector) {
+      return console.warn(
+        `[Widget] You must define a selector to use the Widget`
+      )
     }
 
-    ReactDOM.render(
-      <Context.Provider
-        value={{
-          i18n,
-          domain
-        }}
-      >
-        <ProviderLegacy i18n={i18n} domain={domain}>
-          {children}
-        </ProviderLegacy>
-      </Context.Provider>,
-      node
-    )
-  }
+    const nodes = document.querySelectorAll(selector)
+    if (!nodes.length) {
+      return console.warn(
+        `[Widget] unable find nodes using selector ${selector}`
+      )
+    }
 
-  render() {
-    return null
-  }
+    // depending on renderMultiple, get the full array or only the first one
+    const nodesToRender = renderMultiple ? [].slice.call(nodes) : [nodes[0]]
+
+    isVisible &&
+      nodesToRender.map(node => renderWidgetOnDOM({children, context, node}))
+  })
+
+  return null
+}
+
+Widget.propTypes = {
+  children: PropTypes.element.isRequired,
+  context: PropTypes.object,
+  isVisible: PropTypes.bool,
+  selector: PropTypes.string.isRequired
 }

@@ -1,97 +1,74 @@
 /* eslint import/no-webpack-loader-syntax:0 */
 import React from 'react'
 import PropTypes from 'prop-types'
+import SUIContext from '@s-ui/react-context'
 
 import Preview from '../../../../src/components/preview'
-
-import SUIContext from '@s-ui/react-context'
-import withContext from '../../../../src/components/demo/HoC/withContext'
 import Style from '../../../../src/components/style'
-import When from '../../../../src/components/when'
 import {
   createContextByType,
   cleanDisplayName,
-  pipe,
   removeDefaultContext
 } from '../../../../src/components/demo/utilities'
 
 import Component, * as named from 'component'
 
 import './index.scss'
-
 let playground
 try {
-  playground = require('!raw-loader!demo/playground')
+  playground = require('!raw-loader!demo/playground').default
 } catch (e) {}
 
-const EMPTY = 0
 const nonDefault = removeDefaultContext(named)
 
-class Raw extends React.PureComponent {
-  static propTypes = {
-    actualContext: PropTypes.string,
-    actualStyle: PropTypes.string,
-    contexts: PropTypes.object,
-    demo: PropTypes.node,
-    demoStyles: PropTypes.string,
-    themes: PropTypes.object
-  }
+export default function Raw({
+  actualContext = 'default',
+  actualStyle = 'default',
+  contexts = {},
+  demo: DemoComponent,
+  demoStyles,
+  themes
+}) {
+  const context =
+    Object.keys(contexts).length && createContextByType(contexts, actualContext)
 
-  state = {
-    playground,
-    actualContext: this.props.actualContext || 'default',
-    actualStyle: this.props.actualStyle || 'default'
-  }
+  // check if is a normal component or it's wrapped with a React.memo method
+  const ComponentToRender = Component.type ? Component.type : Component
 
-  render() {
-    const {playground, actualContext, actualStyle} = this.state
-    const {contexts = {}, themes, demo: DemoComponent, demoStyles} = this.props
+  return (
+    <div className="Raw">
+      <Style id="sui-studio-raw-demo">{demoStyles}</Style>
+      <Style id="sui-studio-raw-theme">{themes[actualStyle]}</Style>
 
-    const context =
-      Object.keys(contexts).length !== EMPTY &&
-      createContextByType(contexts, actualContext)
-
-    // check if is a normal component or it's wrapped with a React.memo method
-    const ComponentToRender = Component.type ? Component.type : Component
-    const Enhance = pipe(withContext(context, context))(ComponentToRender)
-
-    const EnhanceDemoComponent =
-      DemoComponent && pipe(withContext(context, context))(DemoComponent)
-
-    return (
-      <div className="Raw">
-        <Style>{themes[actualStyle]}</Style>
-        <Style>{demoStyles}</Style>
-
-        <div className="Raw-center">
-          <When value={!EnhanceDemoComponent && playground}>
-            {() => (
-              <React.Fragment>
-                <Preview
-                  scope={{
-                    context,
-                    React,
-                    [`${cleanDisplayName(Enhance.displayName)}`]: Enhance,
-                    ...nonDefault
-                  }}
-                  code={playground}
-                />
-              </React.Fragment>
-            )}
-          </When>
-          <When value={EnhanceDemoComponent}>
-            {() => (
-              <SUIContext.Provider value={context}>
-                <EnhanceDemoComponent />
-              </SUIContext.Provider>
-            )}
-          </When>
-        </div>
+      <div className="Raw-center">
+        {!DemoComponent && playground && (
+          <Preview
+            scope={{
+              context,
+              React,
+              [cleanDisplayName(
+                ComponentToRender.displayName
+              )]: ComponentToRender,
+              ...nonDefault
+            }}
+            code={playground}
+          />
+        )}
+        {DemoComponent && (
+          <SUIContext.Provider value={context}>
+            <DemoComponent />
+          </SUIContext.Provider>
+        )}
       </div>
-    )
-  }
-
-  handleChangeCodeMirror = playground => this.setState({playground})
+    </div>
+  )
 }
 
-export default Raw
+Raw.propTypes = {
+  actualContext: PropTypes.string,
+  actualStyle: PropTypes.string,
+  contexts: PropTypes.object,
+  demo: PropTypes.node,
+  demoStyles: PropTypes.string,
+  themes: PropTypes.object
+}

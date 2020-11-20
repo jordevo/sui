@@ -1,5 +1,5 @@
 import DefaultAdapter from './adapters/default'
-import {slugify} from './slugify'
+import {slugify} from '@s-ui/js/lib/string/slugify'
 
 export default class Rosetta {
   constructor({adapter = new DefaultAdapter()} = {}) {
@@ -38,6 +38,10 @@ export default class Rosetta {
 
   get currency() {
     return this._currency
+  }
+
+  get languages() {
+    return this._languages
   }
 
   set languages(languages) {
@@ -84,6 +88,14 @@ export default class Rosetta {
       throw new Error('i18n.f should receive any value as a second argument')
 
     switch (type) {
+      case 'percentage': {
+        const {minimumFractionDigits = 0, maximumFractionDigits = 2} = options
+        return this.n(value / 100, {
+          style: 'percent',
+          minimumFractionDigits,
+          maximumFractionDigits
+        })
+      }
       case 'phone': {
         const {separator = ' '} = options
         return value
@@ -94,6 +106,14 @@ export default class Rosetta {
     }
 
     throw new Error(`Invalid type '${type}' passed to i18n.f`)
+  }
+
+  formatPercentage(value, options) {
+    return this.f('percentage', value, options)
+  }
+
+  formatPhone(phoneNumber, options) {
+    return this.f('phone', phoneNumber, options)
   }
 
   url(urlPattern, allowQueryParams) {

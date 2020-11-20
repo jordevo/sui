@@ -2,36 +2,36 @@
   "name": "@s-ui/sui",
   "version": "0.0.0",
   "private": true,
-  "description": "Monorepo for SUI (Schibsted User Interface) packages.",
+  "description": "Monorepo for SUI (Simple User Interface) packages.",
   "keywords": [
-    "schibsted",
+    "adevinta",
     "monorepo",
     "sui"
   ],
   "scripts": {
     "phoenix": "npx @s-ui/mono phoenix",
+    "phoenix:ci": "npx -p @s-ui/mono sui-mono phoenix --ci",
     "co": "sui-mono commit",
     "lint": "sui-lint js && sui-lint sass",
-    "test": "cross-env NODE_ENV=test npm run test:client && cross-env NODE_ENV=test npm run test:server",
+    "test": "NODE_ENV=test npm run test:client && NODE_ENV=test npm run test:server",
     "test:ci": "npm run test:server",
-    "test:client": "cross-env NODE_ENV=test sui-test browser -P \"packages/*/test/**/*Spec.js\" -I 'packages/*/test/server/*Spec.js'",
+    "test:client": "NODE_ENV=test sui-test browser -P \"packages/*/test/**/*Spec.js\" -I 'packages/*/test/server/*Spec.js'",
     "test:client:watch": "npm run test:client -- --watch",
-    "test:server": "cross-env NODE_ENV=test & sui-test server -P \"./packages/*/\\!\\(browser\\)/server/*.js\"",
+    "test:server": "NODE_ENV=test & sui-test server -P \"./packages/*/\\!\\(browser\\)/server/*.js\"",
     "test:server:watch": "npm run test:server -- --watch",
+    "test:e2e": "node ./packages/sui-studio/test/server/integration/static-server.js ./packages/sui-studio/test/server/integration/sample-studio/public && npx sui-test e2e --baseUrl=http://localhost:1234",
     "wiki:pull": "git subtree pull --prefix=.wiki https://github.com/SUI-Components/sui.wiki.git master --squash",
-    "wiki:push": "git subtree push --prefix=.wiki https://github.com/SUI-Components/sui.wiki.git master",
-    "commitmsg": "validate-commit-msg",
-    "precommit": "sui-precommit run"
+    "wiki:push": "git subtree push --prefix=.wiki https://github.com/SUI-Components/sui.wiki.git master"
   },
   "devDependencies": {
+    "@babel/cli": "7.12.1",
     "@s-ui/lint": "3",
     "@s-ui/mono": "1",
     "@s-ui/precommit": "2",
-    "@s-ui/test": "2",
-    "chai": "3.5.0",
-    "cross-env": "5.1.6",
-    "husky": "0.13.4",
-    "validate-commit-msg": "2.12.2"
+    "@s-ui/test": "4",
+    "chai": "4.2.0",
+    "husky": "4.3.0",
+    "validate-commit-msg": "2.14.0"
   },
   "config": {
     "sui-mono": {
@@ -52,8 +52,7 @@
       "sui"
     ]
   },
-  "sasslintConfig": "./node_modules/@s-ui/lint/sass-lint.yml",
-  "author": "David Almeida <davidbarna@gmail.com>",
+  "author": "",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SUI-Components/sui.git"
@@ -62,5 +61,15 @@
     "url": "https://github.com/SUI-Components/sui/issues"
   },
   "homepage": "https://github.com/SUI-Components/sui/#readme",
-  "license": "MIT"
+  "license": "MIT",
+  "prettier": "./node_modules/@s-ui/lint/.prettierrc.js",
+  "stylelint": {
+    "extends": "./node_modules/@s-ui/lint/stylelint.config.js"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "sui-precommit run",
+      "commit-msg": "validate-commit-msg"
+    }
+  }
 }

@@ -3,7 +3,9 @@ import {expect} from 'chai'
 import {
   parseQueryString,
   toQueryString,
-  fromArrayToCommaQueryString
+  fromArrayToCommaQueryString,
+  getRandomString,
+  highlightText
 } from '../src/string/index'
 
 describe('@s-ui/js', () => {
@@ -13,6 +15,33 @@ describe('@s-ui/js', () => {
       const query = 'a=1&b=test'
       expect(toQueryString(params)).to.be.equal(query)
     })
+
+    it('should convert object params to query string with arrayFormat comma option', () => {
+      const queryParams = {a: 1, b: 'lorem/ipsum', m: [1, 2, 3]}
+      const options = {arrayFormat: 'comma'}
+      const queryString = toQueryString(queryParams, options)
+
+      const expected = 'a=1&b=lorem%2Fipsum&m=1%2C2%2C3'
+      expect(expected).to.be.equal(queryString)
+    })
+
+    it('should convert object params to query string with arrayFormat comma option and no encoding', () => {
+      const queryParams = {a: 1, b: 'lorem/ipsum', m: [1, 2, 3]}
+      const options = {arrayFormat: 'comma', encode: false}
+      const queryString = toQueryString(queryParams, options)
+
+      const expected = 'a=1&b=lorem/ipsum&m=1,2,3'
+      expect(expected).to.be.equal(queryString)
+    })
+
+    it('should convert object params to query string with arrayFormat repeat and delimiter :', () => {
+      const queryParams = {a: 1, b: 'test', m: [1, 2]}
+      const options = {arrayFormat: 'repeat', delimiter: ':'}
+      const queryString = toQueryString(queryParams, options)
+
+      const expected = 'a=1:b=test:m=1:m=2'
+      expect(expected).to.be.equal(queryString)
+    })
   })
   describe('string:parseQueryString', () => {
     it('should convert query string to object params', () => {
@@ -20,12 +49,51 @@ describe('@s-ui/js', () => {
       const params = {a: '1', b: 'test'}
       expect(parseQueryString(query)).to.deep.equal(params)
     })
+
+    it('should convert query string to object params with comma option', () => {
+      const query = '?a=1&b=test&m=1,2,3'
+      const options = {comma: true}
+      const parsedQueryParams = parseQueryString(query, options)
+
+      const expected = {a: '1', b: 'test', m: ['1', '2', '3']}
+      expect(parsedQueryParams).to.deep.equal(expected)
+    })
+
+    it('should convert query string to object params with delimiter option', () => {
+      const query = '?a=b:c=d'
+      const options = {delimiter: ':'}
+      const parsedQueryParams = parseQueryString(query, options)
+
+      const expected = {a: 'b', c: 'd'}
+      expect(parsedQueryParams).to.deep.equal(expected)
+    })
   })
   describe('string:fromArrayToCommaQueryString', () => {
     it('should convert params array to comma separated object params', () => {
       const paramsArray = {a: 1, b: 2, c: [3, 4]}
       const params = 'a=1&b=2&c=3,4'
       expect(fromArrayToCommaQueryString(paramsArray)).to.deep.equal(params)
+    })
+  })
+  describe('string:getRandomString', () => {
+    it('should get a random string', () => {
+      const randomString = getRandomString()
+      expect(randomString).to.be.an('string')
+      expect(randomString).to.have.lengthOf(15)
+    })
+  })
+  describe('string:highlightText', () => {
+    it('should highlight text', () => {
+      const highlightedText = highlightText({
+        value: 'Cálaca',
+        query: 'ca',
+        startTag: `<strong>`,
+        endTag: '</strong>'
+      })
+      expect(highlightedText).to.be.an('string')
+      expect(highlightedText).to.be.equal(
+        `<strong>Cá</strong>la<strong>ca</strong>`
+      )
     })
   })
 })

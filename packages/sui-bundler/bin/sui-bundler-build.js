@@ -1,29 +1,40 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
-// https://github.com/coryhouse/react-slingshot/blob/master/tools/build.js
-const program = require('commander')
-const rimraf = require('rimraf')
-const webpack = require('webpack')
+
+const fs = require('fs')
+const minifyStream = require('minify-stream')
 const path = require('path')
-const fs = require('fs-extra')
+const program = require('commander')
+const replaceStream = require('replacestream')
+const rimraf = require('rimraf')
+const staticModule = require('static-module')
+const webpack = require('webpack')
+
 const config = require('../webpack.config.prod')
+const linkLoaderConfigBuilder = require('../loaders/linkLoaderConfigBuilder')
+const log = require('../shared/log')
 const {config: projectConfig} = require('../shared')
 
-// TODO: Extract this
-const chalk = require('chalk')
-const chalkError = chalk.red
-const chalkSuccess = chalk.green
-const chalkWarning = chalk.yellow
-const chalkProcessing = chalk.blue
+process.env.NODE_ENV = process.env.NODE_ENV || 'production'
 
 program
   .option('-C, --clean', 'Remove public folder before create a new one')
+  .option(
+    '--link-package [package]',
+    'Replace each occurrence of this package with an absolute path to this folder',
+    (v, m) => {
+      m.push(v)
+      return m
+    },
+    []
+  )
   .option('-c, --context [folder]', 'Context folder (cwd by default)')
   .on('--help', () => {
     console.log('  Examples:')
     console.log('')
     console.log('    $ sui-bundler build -S')
     console.log('    $ sui-bundler build -SC')
+    console.log('    $ sui-bundler dev --link-package /my/domain/folder')
     console.log('    $ sui-bundler build --help')
     console.log('')
   })
@@ -31,52 +42,102 @@ program
 
 const {clean = false, context} = program
 config.context = context || config.context
+const packagesToLink = program.linkPackage || []
 
-process.env.NODE_ENV = process.env.NODE_ENV
-  ? process.env.NODE_ENV
-  : 'production'
+const nextConfig = packagesToLink.length
+  ? linkLoaderConfigBuilder({
+      config,
+      packagesToLink,
+      linkAll: false
+    })
+  : config
 
 if (clean) {
-  console.log(chalkProcessing('Removing previous build...'))
+  log.processing('Removing previous build...')
   rimraf.sync(path.resolve(process.env.PWD, 'public'))
 }
-console.log(
-  chalkProcessing('Generating minified bundle. This will take a moment...')
-)
 
-webpack(config).run((error, stats) => {
+log.processing('Generating minified bundle. This will take a moment...')
+
+webpack(nextConfig).run((error, stats) => {
   if (error) {
-    console.log(chalkError(error))
+    log.error(error)
     return 1
   }
 
-  const jsonStats = stats.toJson()
-
   if (stats.hasErrors()) {
-    return jsonStats.errors.map(error => console.log(chalkError(error)))
+    const jsonStats = stats.toJson('errors-only')
+    return jsonStats.errors.map(log.error)
   }
 
   if (stats.hasWarnings()) {
-    console.log(chalkWarning('Webpack generated the following warnings: '))
-    jsonStats.warnings.map(warning => console.log(chalkWarning(warning)))
+    const jsonStats = stats.toJson('errors-warnings')
+    log.warn('Webpack generated the following warnings: ')
+    jsonStats.warnings.map(log.warn)
   }
 
   console.log(`Webpack stats: ${stats}`)
 
-  if (projectConfig.offline && projectConfig.offline.whitelist) {
-    fs.copySync(
-      path.resolve(process.cwd(), 'public', 'index.html'),
-      path.resolve(process.cwd(), 'public', '200.html')
+  const offlinePath = path.join(process.cwd(), 'src', 'offline.html')
+  const offlinePageExists = fs.existsSync(offlinePath)
+  const {offline: offlineConfig = {}} = projectConfig
+
+  const staticsCacheOnly = offlineConfig.staticsCacheOnly || false
+
+  if (offlinePageExists) {
+    fs.copyFileSync(
+      path.resolve(offlinePath),
+      path.resolve(process.cwd(), 'public', 'offline.html')
     )
-    console.log(chalkSuccess('200.html create to be used in your Offline App'))
   }
 
-  console.log(
-    chalkSuccess(
-      `Your app is compiled in ${
-        process.env.NODE_ENV
-      } mode in /public. It's ready to roll!`
+  if (offlinePageExists || staticsCacheOnly) {
+    const manifest = require(path.resolve(
+      process.cwd(),
+      'public',
+      'asset-manifest.json'
+    ))
+
+    const rulesOfFilesToNotCache = [
+      'runtime~', // webpack's runtime chunks are not meant to be cached
+      'LICENSE.txt', // avoid LICENSE files
+      '.map' // source maps
+    ]
+    const manifestStatics = Object.values(manifest).filter(
+      url => !rulesOfFilesToNotCache.some(rule => url.includes(rule))
     )
+
+    const importScripts = offlineConfig.importScripts || []
+
+    const stringImportScripts = importScripts
+      .map(url => `importScripts("${url}")`)
+      .join('\n')
+
+    Boolean(importScripts.length) &&
+      console.log('\nExternal Scripts Added to the SW:\n', stringImportScripts)
+
+    // generates the service worker
+    fs.createReadStream(path.resolve(__dirname, '..', 'service-worker.js'))
+      .pipe(replaceStream('// IMPORT_SCRIPTS_HERE', stringImportScripts))
+      .pipe(
+        staticModule({
+          'static-manifest': () => JSON.stringify(manifestStatics),
+          'static-cache-name': () => JSON.stringify(Date.now().toString()),
+          'static-statics-cache-only': () => JSON.stringify(staticsCacheOnly)
+        })
+      )
+      .pipe(minifyStream({sourceMap: false}))
+      .pipe(
+        fs.createWriteStream(
+          path.resolve(process.cwd(), 'public', 'service-worker.js')
+        )
+      )
+
+    console.log('\nService worker generated succesfully!\n')
+  }
+
+  log.success(
+    `Your app is compiled in ${process.env.NODE_ENV} mode in /public. It's ready to roll!`
   )
 
   return 0

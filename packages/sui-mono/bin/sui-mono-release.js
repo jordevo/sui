@@ -1,5 +1,5 @@
 /* eslint no-console:0 */
-require('util.promisify/shim')()
+
 const program = require('commander')
 const path = require('path')
 const config = require('../src/config')
@@ -7,11 +7,16 @@ const checker = require('../src/check')
 const {serialSpawn, showError} = require('@s-ui/helpers/cli')
 const {getPackageJson} = require('@s-ui/helpers/packages')
 const {exec: execNative} = require('child_process')
+const gitUrlParse = require('git-url-parse')
 const util = require('util')
 const exec = util.promisify(execNative)
 
 program
   .option('-S, --scope <scope>', 'release a single scope')
+  .option('-T, --github-token <token>', 'github token')
+  .option('-U, --github-user <user>', 'github user')
+  .option('-E, --github-email <email>', 'github email')
+  .option('--skip-ci', 'Add [skip ci] to release commit message', false)
   .on('--help', () => {
     console.log('  Description:')
     console.log('')
@@ -62,11 +67,9 @@ const singlePackageRelease = ({status, packageScope}) =>
     .filter(scope => scope === packageScope)
     .map(scope => scopeMapper({scope, status}))
 
-const releaseEachPkg = ({pkg, code} = {}) => {
+const releaseEachPkg = ({pkg, code} = {}, {skipCI} = {}) => {
   return new Promise((resolve, reject) => {
-    if (code === 0) {
-      return resolve()
-    }
+    if (code === 0) return resolve()
 
     const isMonoPackage = config.isMonoPackage()
 
@@ -80,29 +83,34 @@ const releaseEachPkg = ({pkg, code} = {}) => {
     const pkgInfo = require(path.join(cwd, 'package.json'))
     const scripts = pkgInfo.scripts || {}
 
-    let releaseCommands = [
+    const releaseCommands = [
       ['npm', ['--no-git-tag-version', 'version', `${RELEASE_CODES[code]}`]],
       ['git', ['add', path.join(cwd, 'package.json')]]
     ]
-    let docCommands = [
+    const docCommands = [
       [suiMonoBinPath, ['changelog', cwd]],
       ['git', ['add', path.join(cwd, changelogFilename)]],
       ['git', ['commit --amend --no-verify --no-edit']]
     ]
-    let publishCommands = [
-      scripts['build'] && ['npm', ['run', 'build']],
+    const publishCommands = [
+      scripts.build && ['npm', ['run', 'build']],
       !pkgInfo.private && ['npm', ['publish', `--access=${publishAccess}`]],
-      ['git', ['push', '--tags', 'origin', 'HEAD']]
+      ['git', ['push', '-f', '--tags', 'origin', 'HEAD']]
     ].filter(Boolean)
 
     serialSpawn(releaseCommands, {cwd})
       .then(() => {
         // Create release commit
         const {version} = getPackageJson(cwd, true)
-        return serialSpawn(
-          [['git', [`commit -m "release(${packageScope}): v${version}"`]]],
-          {cwd}
-        )
+
+        // We're adding [skip ci] to the commit message to avoid
+        // start a build on CI if not needed
+        // docs: https://docs.travis-ci.com/user/customizing-the-build/#skipping-a-build
+        const commitMsg = `release(${packageScope}): v${version}${
+          skipCI ? ' [skip ci]' : ''
+        }`
+
+        return serialSpawn([['git', [`commit -m "${commitMsg}"`]]], {cwd})
       })
       .then(() => serialSpawn(docCommands))
       .then(() => {
@@ -124,11 +132,11 @@ const releaseMode = packageScope ? singlePackageRelease : releasesByPackages
 
 const checkIsMasterBranchActive = async ({status, cwd}) => {
   try {
-    const output = await exec(`git rev-parse --abbrev-ref HEAD`, {
+    const {stdout} = await exec(`git rev-parse --abbrev-ref HEAD`, {
       cwd
     })
 
-    if (output.stdout.trim() === 'master') {
+    if (stdout.trim() === 'master') {
       return Promise.resolve(status)
     } else {
       throw new Error(
@@ -142,18 +150,68 @@ const checkIsMasterBranchActive = async ({status, cwd}) => {
   }
 }
 
+const automaticRelease = async ({
+  githubToken,
+  githubUser,
+  githubEmail,
+  cwd
+}) => {
+  const {stdout} = await exec('git config --get remote.origin.url', {cwd})
+  const repoURL = stdout.trim()
+  const gitURL = gitUrlParse(repoURL).toString('https')
+  const authURL = new URL(gitURL)
+  authURL.username = githubToken
+
+  const {
+    stdout: rawIsShallowRepository
+  } = await exec('git rev-parse --is-shallow-repository', {cwd})
+  const isShallowRepository = rawIsShallowRepository === 'true'
+
+  if (isShallowRepository) await exec(`git pull --unshallow --quiet`, {cwd})
+
+  await exec(`git config --global user.email "${githubEmail}"`, {cwd})
+  await exec(`git config --global user.name "${githubUser}"`, {cwd})
+  await exec('git remote rm origin', {cwd})
+  await exec(`git remote add origin ${authURL} > /dev/null 2>&1`, {cwd})
+  await exec(`git checkout master`, {cwd})
+  await exec(`git pull origin master`, {cwd})
+}
+
+const isAutomaticRelease = ({githubToken, githubUser, githubEmail}) => {
+  return githubToken && githubUser && githubEmail
+}
+
 checker
   .check()
-  .then(status => checkIsMasterBranchActive({status, cwd: process.cwd()}))
+  .then(async status => {
+    const {githubEmail, githubToken, githubUser} = program
+    isAutomaticRelease({
+      githubEmail,
+      githubToken,
+      githubUser
+    })
+      ? await automaticRelease({
+          githubEmail,
+          githubToken,
+          githubUser,
+          cwd: process.cwd()
+        })
+      : await checkIsMasterBranchActive({status, cwd: process.cwd()})
+    return status
+  })
   .then(status => releaseMode({status, packageScope}))
   .then(releases =>
     releases
       .filter(({code}) => code !== 0)
-      .map(release => () => releaseEachPkg(release))
+      .map(release => () => releaseEachPkg(release, {skipCI: program.skipCi}))
       // https://gist.github.com/istarkov/a42b3bd1f2a9da393554
       .reduce(
         (m, p) => m.then(v => Promise.all([...v, p()])),
         Promise.resolve([])
       )
   )
-  .catch(console.log.bind(console))
+  .catch(err => {
+    console.error('[sui-mono release] ERROR:')
+    console.error(err)
+    process.exit(1)
+  })

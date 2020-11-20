@@ -1,47 +1,36 @@
 // https://github.com/developit/karmatic/blob/master/src/index.js
 const {Server} = require('karma')
-const configure = require('./config')
+const config = require('./config')
 const CWD = process.cwd()
 
-const createServer = config => {
-  let resolve, reject
+module.exports = ({ci, pattern, ignorePattern, srcPattern, timeout, watch}) => {
+  if (ci) config.browsers = ['Firefox']
+  if (ignorePattern) config.exclude = [ignorePattern]
+  if (watch) config.singleRun = false
 
-  // eslint-disable-next-line
-  let promise = new Promise((res, rej) => {
-    resolve = res
-    reject = rej
-  })
-
-  let callback = code => {
-    if (code === 0) return resolve()
-    let err = Error(`Exit ${code}`)
-    err.code = code
-    reject(err)
-  }
-
-  let server = new Server(config, callback)
-
-  server.completion = promise
-  return server
-}
-
-module.exports = async ({watch, ci, pattern, ignorePattern, srcPattern}) => {
-  if (watch) configure.singleRun = false
-  if (ci) configure.browsers = ['Firefox']
-  if (ignorePattern) configure.exclude = [ignorePattern]
-
-  configure.files = [
+  config.files = [
     `${CWD}/node_modules/@babel/polyfill/dist/polyfill.min.js`,
+    srcPattern ? `${CWD}/${srcPattern}` : '',
     `${CWD}/${pattern}`
-  ]
-  configure.preprocessors = {
-    [pattern]: ['webpack']
+  ].filter(Boolean)
+  config.preprocessors = {
+    [pattern]: ['webpack'],
+    ...(srcPattern && {[srcPattern]: ['webpack']})
   }
 
-  let server = createServer(configure)
+  config.client.mocha = {
+    ...config.client.mocha,
+    ...(timeout && {timeout})
+  }
 
-  server.start()
+  return new Promise((resolve, reject) => {
+    const server = new Server(config, code => {
+      if (code === 0) return resolve()
+      const err = new Error(`Exit ${code}`)
+      err.code = code
+      reject(err)
+    })
 
-  // eslint-disable-next-line
-  return await server.completion
+    server.start()
+  })
 }
